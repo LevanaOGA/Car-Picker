@@ -1,0 +1,299 @@
+﻿<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Car Picker</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+<body>
+    <div class="page-shell">
+        <header class="hero">
+            <p class="eyebrow">Python Car Matchmaker</p>
+            <h1>Find a car that fits how you actually want to drive.</h1>
+            <p class="hero-copy">
+                Answer as many or as few questions as you want. Every question includes a no-preference option,
+                so the shortlist stays flexible instead of forcing a fake opinion.
+            </p>
+        </header>
+
+        <main class="layout">
+            <section class="panel form-panel">
+                <div class="panel-heading">
+                    <h2>Your preferences</h2>
+                    <p>Choose one value per filter. Leave anything flexible on no preference.</p>
+                </div>
+
+                <form method="post" class="questionnaire" autocomplete="off">
+                    {% for question in questions %}
+                    <div class="question-card">
+                        <label class="question-label" for="{{ question.id }}">{{ question.label }}</label>
+                        <select class="preference-select" id="{{ question.id }}" name="{{ question.id }}" autocomplete="off">
+                            {% for value, label in question.options %}
+                            <option value="{{ value }}" {% if answers[question.id] == value %}selected{% endif %}>{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                        <p class="question-help">{{ question.description }}</p>
+                    </div>
+                    {% endfor %}
+
+                    <div class="form-actions">
+                        <button type="submit" class="primary-button">Show recommendations</button>
+                        <a href="/" class="secondary-button">Clear selections</a>
+                    </div>
+                </form>
+            </section>
+
+            <section class="panel results-panel">
+                <div class="panel-heading">
+                    <h2>Results</h2>
+                    <p>The main list favors exact matches. Honorable mentions are near misses.</p>
+                </div>
+
+                {% if results %}
+                    <div class="results-meta">
+                        <div>
+                            <span class="meta-label">Criteria used</span>
+                            <strong>{{ results.selected_count }}</strong>
+                        </div>
+                        <div>
+                            <span class="meta-label">Honorable miss allowance</span>
+                            <strong>{{ results.honorable_limit }}</strong>
+                        </div>
+                    </div>
+
+                    {% if results.criteria %}
+                    <div class="chips">
+                        {% for criterion in results.criteria %}
+                        <span class="chip">{{ criterion.label }}: {{ criterion.value_label }}</span>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <p class="empty-state">No specific criteria selected yet, so the app is showing broad enthusiast-friendly choices.</p>
+                    {% endif %}
+                    <div class="section-label">
+                        {% if results.exact_match_found %}
+                        <h3>Best matches</h3>
+                        <p>These cars satisfied every selected preference.</p>
+                        {% else %}
+                        <h3>Closest matches</h3>
+                        <p>No car hit every selected preference, so these are the best overall fits.</p>
+                        {% endif %}
+                    </div>
+
+                    <div class="card-stack">
+                        {% for item in results.recommendations %}
+                        <article class="result-card">
+                            <div class="result-media">
+                                <img
+                                    class="car-photo"
+                                    data-wiki-page="{{ item.car.image_page }}"
+                                    {% if item.car.image_url %}data-image-url="{{ item.car.image_url }}"{% endif %}
+                                    src="{% if item.car.image_url %}{{ item.car.image_url }}{% else %}https://placehold.co/800x520/e9ded0/4e433d?text={{ item.car.name|replace(' ', '+') }}{% endif %}"
+                                    alt="{{ item.car.name }}"
+                                    loading="lazy"
+                                >
+                            </div>
+                            <div class="card-topline">
+                                <h4>{{ item.car.name }}</h4>
+                                <span>{{ item.match_count }} / {{ results.selected_count }} matches</span>
+                            </div>
+                            <p class="summary">{{ item.car.summary }}</p>
+                            <div class="spec-strip">
+                                <span>{{ item.year_label }}</span>
+                                <span>{{ item.car.body_type|replace('_', ' ')|title }}</span>
+                                <span>{{ item.car.drivetrain|upper }}</span>
+                                <span>{{ item.car.transmission|replace('_', ' ')|title }}</span>
+                            </div>
+                            {% if item.missed %}
+                            <p class="miss-copy">Missed on: {% for miss in item.missed %}{{ miss.label }} (wanted {{ miss.selected }}){% if not loop.last %}, {% endif %}{% endfor %}</p>
+                            {% endif %}
+                        </article>
+                        {% endfor %}
+                    </div>
+
+                    {% if results.honorable_mentions %}
+                    <div class="section-label honorable">
+                        <h3>Honorable mentions</h3>
+                        <p>These nearly made it, but missed a small number of selected criteria.</p>
+                    </div>
+                    <div class="card-stack secondary">
+                        {% for item in results.honorable_mentions %}
+                        <article class="result-card honorable-card">
+                            <div class="result-media">
+                                <img
+                                    class="car-photo"
+                                    data-wiki-page="{{ item.car.image_page }}"
+                                    {% if item.car.image_url %}data-image-url="{{ item.car.image_url }}"{% endif %}
+                                    src="{% if item.car.image_url %}{{ item.car.image_url }}{% else %}https://placehold.co/800x520/e9ded0/4e433d?text={{ item.car.name|replace(' ', '+') }}{% endif %}"
+                                    alt="{{ item.car.name }}"
+                                    loading="lazy"
+                                >
+                            </div>
+                            <div class="card-topline">
+                                <h4>{{ item.car.name }}</h4>
+                                <span>{{ item.match_count }} / {{ results.selected_count }} matches</span>
+                            </div>
+                            <p class="summary">{{ item.car.summary }}</p>
+                            <p class="miss-copy">Missed on: {% for miss in item.missed %}{{ miss.label }} (wanted {{ miss.selected }}){% if not loop.last %}, {% endif %}{% endfor %}</p>
+                        </article>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+
+                    {% if results.more_options %}
+                    <div class="section-label honorable">
+                        <h3>More options</h3>
+                        <p>Keep scrolling and the app will loosen the match quality, showing cars that miss more of your selected criteria.</p>
+                    </div>
+                    <div class="more-options-shell">
+                        <button type="button" class="secondary-button more-options-button" id="show-more-options">
+                            See more options
+                        </button>
+                        <div class="card-stack tertiary" id="more-options-list" hidden>
+                            {% for item in results.more_options %}
+                            <article class="result-card extra-option-card more-option-card" data-batch-index="{{ loop.index0 }}">
+                                <div class="result-media">
+                                    <img
+                                        class="car-photo"
+                                        data-wiki-page="{{ item.car.image_page }}"
+                                        {% if item.car.image_url %}data-image-url="{{ item.car.image_url }}"{% endif %}
+                                        src="{% if item.car.image_url %}{{ item.car.image_url }}{% else %}https://placehold.co/800x520/e9ded0/4e433d?text={{ item.car.name|replace(' ', '+') }}{% endif %}"
+                                        alt="{{ item.car.name }}"
+                                        loading="lazy"
+                                    >
+                                </div>
+                                <div class="card-topline">
+                                    <h4>{{ item.car.name }}</h4>
+                                    <span>{{ item.match_count }} / {{ results.selected_count }} matches</span>
+                                </div>
+                                <p class="summary">{{ item.car.summary }}</p>
+                                <div class="spec-strip">
+                                    <span>{{ item.year_label }}</span>
+                                    <span>{{ item.car.body_type|replace('_', ' ')|title }}</span>
+                                    <span>{{ item.car.drivetrain|upper }}</span>
+                                    <span>{{ item.car.transmission|replace('_', ' ')|title }}</span>
+                                </div>
+                                {% if item.missed %}
+                                <p class="miss-copy">Missed on: {% for miss in item.missed %}{{ miss.label }} (wanted {{ miss.selected }}){% if not loop.last %}, {% endif %}{% endfor %}</p>
+                                {% endif %}
+                            </article>
+                            {% endfor %}
+                        </div>
+                        <div id="more-options-sentinel" hidden></div>
+                    </div>
+                    {% endif %}
+                {% else %}
+                    <div class="empty-results">
+                        <h3>Set your vibe, then let the app sort the cars.</h3>
+                        <p>
+                            The matching engine treats your chosen answers as active filters. Exact matches go into the main list,
+                            while close misses are saved for honorable mentions so you still see interesting alternatives.
+                        </p>
+                    </div>
+                {% endif %}
+            </section>
+        </main>
+    </div>
+
+    <button type="button" class="back-to-top" id="back-to-top" aria-label="Back to top">
+        Back to top
+    </button>
+
+    <script>
+        const hasResults = {{ 'true' if results else 'false' }};
+
+        if (hasResults && window.history.replaceState) {
+            window.history.replaceState({}, document.title, window.location.pathname);
+        }
+
+        const photoElements = document.querySelectorAll('.car-photo[data-wiki-page]');
+        photoElements.forEach(async (photo) => {
+            if (photo.dataset.imageUrl) {
+                return;
+            }
+
+            const page = photo.dataset.wikiPage;
+            if (!page) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(page)}`);
+                if (!response.ok) {
+                    return;
+                }
+                const data = await response.json();
+                if (data.originalimage && data.originalimage.source) {
+                    photo.src = data.originalimage.source;
+                } else if (data.thumbnail && data.thumbnail.source) {
+                    photo.src = data.thumbnail.source;
+                }
+            } catch (error) {
+                console.debug('Image lookup failed for', page, error);
+            }
+        });
+
+        const moreOptionsButton = document.getElementById('show-more-options');
+        const moreOptionsList = document.getElementById('more-options-list');
+        const moreOptionsSentinel = document.getElementById('more-options-sentinel');
+        const moreOptionCards = Array.from(document.querySelectorAll('.more-option-card'));
+        const batchSize = 4;
+        let revealedCount = 0;
+
+        function revealMoreOptions() {
+            const nextCount = Math.min(revealedCount + batchSize, moreOptionCards.length);
+            for (let index = revealedCount; index < nextCount; index += 1) {
+                moreOptionCards[index].hidden = false;
+            }
+            revealedCount = nextCount;
+
+            if (revealedCount >= moreOptionCards.length && moreOptionsSentinel) {
+                moreOptionsSentinel.hidden = true;
+            }
+        }
+
+        if (moreOptionsButton && moreOptionsList && moreOptionsSentinel) {
+            moreOptionCards.forEach((card) => {
+                card.hidden = true;
+            });
+
+            moreOptionsButton.addEventListener('click', () => {
+                moreOptionsButton.remove();
+                moreOptionsList.hidden = false;
+                moreOptionsSentinel.hidden = false;
+                revealMoreOptions();
+            });
+
+            const observer = new IntersectionObserver((entries) => {
+                entries.forEach((entry) => {
+                    if (entry.isIntersecting) {
+                        revealMoreOptions();
+                    }
+                });
+            }, { rootMargin: '240px 0px 240px 0px' });
+
+            observer.observe(moreOptionsSentinel);
+        }
+
+        const backToTopButton = document.getElementById('back-to-top');
+        const toggleBackToTop = () => {
+            if (!backToTopButton) {
+                return;
+            }
+            backToTopButton.classList.toggle('visible', window.scrollY > 380);
+        };
+
+        if (backToTopButton) {
+            toggleBackToTop();
+            window.addEventListener('scroll', toggleBackToTop, { passive: true });
+            backToTopButton.addEventListener('click', () => {
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            });
+        }
+    </script>
+</body>
+</html>
